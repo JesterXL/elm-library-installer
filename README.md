@@ -20,12 +20,31 @@ To install:
 
 `npm i elm-library-installer`
 
+Or in Yarn:
+
+`yarn add elm-library-installer`
+
 Ensure this is where your code is and is in the same directory as your `elm.json`. Do not install globally (...you can, I haven't tested it, heh!).
 
 Ensure you already have these installed:
 
 1. Install [Node.js](https://nodejs.org/en/). In a Terminal, type `npm -v` and hit <kbd>Enter</kbd> to verify it worked.
 2. Install [Elm](https://guide.elm-lang.org/install/elm.html). In a Terminal, type `elm --version` and hit <kbd>Enter</kbd> to verify it worked.
+
+# How To Use
+
+In your project directory next to your `elm.json`, run:
+
+`npx elm-library-installer --install --verbose`
+
+From your `package.json` scripts:
+
+```json
+"scripts": {
+    "elm:install": "elm-library-installer --install --verbose"
+}
+```
+Then run `npm run elm:install` or `yarn elm:install`.
 
 # This Doesn't Work For Me
 
