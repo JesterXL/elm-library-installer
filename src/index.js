@@ -3,6 +3,11 @@ const request = require('request-promise')
 const { exec } = require('child_process')
 const fs = require('fs')
 const { getOr, get, map, toPairs, isString, isNil } = require('lodash/fp')
+const debug = require('debug')('elm-library-installer')
+
+const tap = label => (...args) =>
+    debug(`${label} %O`, args) ||
+    Promise.resolve.apply(Promise, args)
 
 const getElmVersion = () =>
     new Promise((success, failure) =>
@@ -79,11 +84,13 @@ const parseJSON = string => {
 
 const downloadElmDependenciesToZIPFiles = targetPath => dependencies =>
     makePathIfItDoesNotExist(targetPath)
+    .then(tap(`makePathIfItDoesNotExist: ${targetPath}`))
     .then(
         () =>
             Promise.all(
                 map(
                     dependency =>
+                        debug("dependency.url:", dependency.url) ||
                         request({
                             uri: dependency.url,
                             encoding: null
@@ -98,6 +105,7 @@ const downloadElmDependenciesToZIPFiles = targetPath => dependencies =>
                 binaries.map(
                     (value, index) => {
                         const dep = dependencies[index]
+                        debug("makePathIfItDoesNotExist:", `${targetPath}/${dep.packagePath}`)
                         return makePathIfItDoesNotExist(`${targetPath}/${dep.packagePath}`)
                     }
                 )
@@ -108,6 +116,7 @@ const downloadElmDependenciesToZIPFiles = targetPath => dependencies =>
                         binaries.map(
                             (value, index) => {
                                 const dep = dependencies[index]
+                                debug("writeFile:", `${targetPath}/${dep.packagePath}/${dep.dependencyName}.zip`)
                                 return writeFile(`${targetPath}/${dep.packagePath}/${dep.dependencyName}.zip`)(value)
                             }
                         )
@@ -190,7 +199,7 @@ const getElm19PackagePath = () =>
 // [jwarden 10.13.2019] NOTE/WARNING/FIXME/TODO: This is Mac only.
 const unzipAndDelete = path => zipFileName =>
     new Promise((success, failure) =>
-        exec(`unzip ${path}/${zipFileName} -d ${path} && rm -f ${path}/${zipFileName}`, (error, stdout, stderr) =>
+        exec(`unzip -o ${path}/${zipFileName} -d ${path} && rm -f ${path}/${zipFileName}`, (error, stdout, stderr) =>
             error
             ? failure(error)
             : success(stdout.trim())
@@ -237,24 +246,41 @@ const getDirectories = source =>
         )
     )
 
-getElm19PackagePath()
-.then(
-    home =>
-        getElmDependencies('elm.json')
-        .then(downloadElmDependenciesToZIPFiles(home))
-        .then(
-            result => log("result:", result) || result
-        )
-        .then(
-            paths =>
-                Promise.all(
-                    map(
-                        ({path, zipFileName }) =>
-                            unzipAndDelete(path)(zipFileName),
-                        paths
+const installAllElm19Dependencies = verboseDebugging =>
+    require('debug').enable('elm-library-installer', verboseDebugging) ||
+    getElm19PackagePath()
+    .then(tap('getElm19PackagePath'))
+    .then(
+        home =>
+            getElmDependencies('elm.json')
+            .then(tap('getElmDependencies'))
+            .then(downloadElmDependenciesToZIPFiles(home))
+            // .then(
+            //     result => log("result:", result) || result
+            // )
+            .then(
+                paths =>
+                    Promise.all(
+                        map(
+                            ({path, zipFileName }) =>
+                                unzipAndDelete(path)(zipFileName),
+                            paths
+                        )
                     )
-                )
-        )
-)
+                    .then(
+                        () =>
+                            map(
+                                get('path'),
+                                paths
+                            )
+                    )
+                    .then(
+                        paths =>
+                            verboseDebugging
+                            ? debug("paths: %O", paths)
+                            : paths
+                    )
+            )
+    )
 
-    
+module.exports = { installAllElm19Dependencies }

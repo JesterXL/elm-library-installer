@@ -4,8 +4,13 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
+    "commander": "^3.0.2",
+    "debug": "^4.1.1",
     "lodash": "^4.17.15",
     "request": "^2.88.0",
     "request-promise": "^4.2.4"
+  },
+  "bin": {
+    "elm-library-installer": "./bin/elm-library-installer.js"
   }
 }
