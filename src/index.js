@@ -2,8 +2,7 @@ const log = console.log
 const request = require('request-promise')
 const { exec } = require('child_process')
 const fs = require('fs')
-const { getOr, get, map, toPairs, isString } = require('lodash/fp')
-const AdmZip = require('adm-zip')
+const { getOr, get, map, toPairs, isString, isNil } = require('lodash/fp')
 
 const getElmVersion = () =>
     new Promise((success, failure) =>
@@ -188,22 +187,61 @@ const getElm19PackagePath = () =>
             `${home}/.elm/0.19.0/package`
     )
 
-// [jwarden 10.13.2019] NOTE/WARNING: This is Mac only.
+// [jwarden 10.13.2019] NOTE/WARNING/FIXME/TODO: This is Mac only.
 const unzipAndDelete = path => zipFileName =>
     new Promise((success, failure) =>
-        exec(`unzip ${path}/${zipFileName} -d ${path}/tmp && rm -f ${path}/${zipFileName}`, (error, stdout, stderr) =>
+        exec(`unzip ${path}/${zipFileName} -d ${path} && rm -f ${path}/${zipFileName}`, (error, stdout, stderr) =>
             error
             ? failure(error)
             : success(stdout.trim())
         )
     )
+    .then(
+        () =>
+            getDirectories(path)
+            .then(
+                paths => {
+                    const [ topDirectory ] = paths
+                    if(isNil(topDirectory) || topDirectory === '') {
+                        return Promise.reject(new Error('No directory found, so cannot move files.'))
+                    }
+                    return copyFilesUpOneDirectory(path)(topDirectory)
+                }
+            )
+    )
 
+const copyFilesUpOneDirectory = path => topDirectory =>
+    new Promise((success, failure) =>
+        exec(
+            `cd ${path} && cp -vaR ${topDirectory}/. . && rm -rf ${topDirectory}`,
+            (error, stdout, stderr) =>
+                error
+                ? failure(error)
+                : success(stdout)
+        )
+    )
+
+const getDirectories = source =>
+    new Promise((success, failure) =>
+        fs.readdir(
+            source, 
+            { withFileTypes: true}, 
+            (error, files) =>
+                error
+                ? failure(error)
+                : success(
+                    files
+                    .filter(dirent => dirent.isDirectory())
+                    .map(dirent => dirent.name)
+                )
+        )
+    )
 
 getElm19PackagePath()
 .then(
     home =>
         getElmDependencies('elm.json')
-        .then(downloadElmDependenciesToZIPFiles('tmp/cow'))
+        .then(downloadElmDependenciesToZIPFiles(home))
         .then(
             result => log("result:", result) || result
         )
@@ -217,5 +255,6 @@ getElm19PackagePath()
                     )
                 )
         )
-        // .then(result => log("result:", result))
 )
+
+    
